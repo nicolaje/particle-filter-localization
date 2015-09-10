@@ -3,10 +3,18 @@
 
 #define PARTICLE_NUMBER 500 // Number of particles
 
+#include <random>
 #include "../Eigen/Dense"
 
 class ParticleFilter {
 private:
+    std::default_random_engine generator;
+    std::normal_distribution<double> distribution;
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
+    
+    bool lastTimeinit=false;
+    double lastTime;
+    
     FILE *fBathy;
     FILE *fWalls;
     
@@ -23,6 +31,9 @@ private:
     double getWallsRangeAt(const Eigen::Vector2d &point,const double &theta);
     double getBathyAt(const Eigen::Vector2d &point);
 
+    Eigen::VectorXd drawSample(const Eigen::VectorXd &mean, const Eigen::MatrixXd &cov);
+    std::vector<Eigen::VectorXd> drawSamples(const int &nbParticle, const Eigen::VectorXd &mean, const Eigen::MatrixXd &cov);
+    
     double mahalanobisDistance(const Eigen::Vector2d &point, const Eigen::Matrix2d &shapeMatrix);
 public:
 
@@ -47,14 +58,14 @@ public:
      * @param u
      * @param uCov
      */
-    void predict(const double &t, const double &theta, const double &u, const Eigen::Matrix2d &uCov);
+    void predict(const double &t, const Eigen::Vector2d &u, const Eigen::Matrix2d &uCov);
 
     /**
      * 
      * @param range
      * @param rangeVar
      */
-    void update_range(const double &range, const double &rangeVar);
+    void update_range(const Eigen::Vector2d &emitterPos, const double &range, const double &rangeVar);
 
     /**
      * 

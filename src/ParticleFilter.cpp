@@ -7,6 +7,16 @@ ParticleFilter::ParticleFilter() {
     this->distribution = std::normal_distribution<double>(0, 1);
 }
 
+void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d &initPosCov)
+{
+    vector<VectorXd> initPositions=this->drawSamples(PARTICLE_NUMBER,initPos,initPosCov);
+    
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        this->particles.col(i)=initPositions[i];
+    }
+}
+
 VectorXd ParticleFilter::drawSample(const Eigen::VectorXd& mean, const Eigen::MatrixXd& cov) {
     // eigen.tuxfamily.org/bz/show_bug.cgi?id=720
     auto normal = [&](double) {

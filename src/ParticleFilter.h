@@ -39,6 +39,8 @@ public:
 
     ParticleFilter();
     
+    void init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d &initPosCov);
+    
     /**
      * 
      * @param filePath ABSOLUTE PATH!!

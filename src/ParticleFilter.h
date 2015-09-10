@@ -1,14 +1,14 @@
 #ifndef PARTICLE_FILTER_H
-#ifndef PARTICLE_FILTER_H
+#define PARTICLE_FILTER_H
 
-#DEFINE PARTICLE_NUMBER // Number of particles
+#define PARTICLE_NUMBER 500 // Number of particles
 
-#include <Eigen/Dense>
+#include "../Eigen/Dense"
 
 class ParticleFilter{
 private:
 
 public:
-}
+};
 
 #endif // PARTICLE_FILTER_H

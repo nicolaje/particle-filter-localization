@@ -82,6 +82,11 @@ public:
      * @param beamVar
      */
     void update_echosounder(const double &beam, const double &beamVar);
+    
+    /**
+     * Uses Low-variance resampling method
+     */
+    void resample();
 };
 
 #endif // PARTICLE_FILTER_H

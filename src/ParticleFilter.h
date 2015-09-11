@@ -15,11 +15,10 @@ private:
     bool lastTimeinit=false;
     double lastTime;
     
-    FILE *fBathy;
-    FILE *fWalls;
+    std::vector<std::pair<double, double> > wallsPolygon;
     
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles;
-    Eigen::Matrix<double, 1, PARTICLE_NUMBER> weights;
+    std::vector<double> logWeights;
 
     Eigen::Vector2d computeMean();
     Eigen::Matrix2d computeCovariance();

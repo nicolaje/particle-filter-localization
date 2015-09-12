@@ -2,10 +2,25 @@
 
 using namespace Eigen;
 using namespace std;
+using namespace octomap;
 
 ParticleFilter::ParticleFilter() {
     this->distribution = std::normal_distribution<double>(0, 1);
 }
+
+//*****************************************
+// Private methods
+//*****************************************
+
+void ParticleFilter::normalize()
+{
+    // Get the highest likelyhood
+    double max=*max_element(logWeights.begin(),logWeights.end());
+}
+
+//*****************************************
+// Public
+//*****************************************
 
 void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d &initPosCov) {
     vector<VectorXd> initPositions = this->drawSamples(PARTICLE_NUMBER, initPos, initPosCov);
@@ -13,6 +28,15 @@ void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d 
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         this->particles.col(i) = initPositions[i];
     }
+}
+
+void ParticleFilter::setMaxRange(const double& range) {
+    this->maxRange = range;
+}
+
+void ParticleFilter::setBathymetricFile(const std::string& filePath) {
+    AbstractOcTree* read = OcTree::read(filePath);
+    this->bathyMap = dynamic_cast<OcTree*> (read);
 }
 
 VectorXd ParticleFilter::drawSample(const Eigen::VectorXd& mean, const Eigen::MatrixXd& cov) {
@@ -42,7 +66,6 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
         this->lastTimeinit = true;
     } else {
         double dt = t - this->lastTime;
-
         vector<VectorXd> inputs = this->drawSamples(PARTICLE_NUMBER, u, uCov);
 
         // TODO: parallelize this loop
@@ -60,7 +83,56 @@ void ParticleFilter::update_range(const Vector2d &emitterPos, const double& rang
     double inv_var = 1. / (2 * rangeVar);
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         double err_sqr = pow((emitterPos - particles.col(i)).norm() - range, 2);
+
         // Update the log-odds
-        weights[i] += log_inv_sqrt - err_sqr*inv_var;
+        logWeights[i] += log_inv_sqrt - err_sqr*inv_var;
+    }
+}
+
+void ParticleFilter::update_sonar_vertical(const double& beamRange, const double& beamRangeVar, const double& beamAngle, const double& robotYaw, const double& z)
+{
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        double xEnd=particles.col(i)[0]+beamRange*cos(robotYaw*M_PI/180)*cos(beamAngle*M_PI/180);
+        double yEnd=particles.col(i)[1]+beamRange*sin(robotYaw*M_PI/180)*cos(beamAngle*M_PI/180);
+        double zEnd=z+beamRange*sin(beamAngle*M_PI/180);
+        OcTreeNode* search = bathyMap->search(xEnd, yEnd, z);
+        if (search != NULL) {
+            this->logWeights[i]+=search->getLogOdds();
+        }
+        else{
+            // Decide what to do when sonar hit free space
+            // Maybe cast a ray and then compute the error !
+        }
+    }
+}
+
+void ParticleFilter::update_sonar_horizontal(const double& beamRange, const double &beamRangeVar, const double &beamAngle, const double& z) {
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        double xEnd = particles.col(i)[0] + beamRange * cos(beamAngle * M_PI / 180);
+        double yEnd = particles.col(i)[1] + beamRange * sin(beamAngle * M_PI / 180);
+        double zEnd = z;
+        OcTreeNode* search = bathyMap->search(xEnd, yEnd, z);
+        if (search != NULL) {
+            this->logWeights[i]+=search->getLogOdds();
+        }
+        else{
+            // Decide what to do when sonar hit free space
+            // Maybe cast a ray and then compute the error !
+        }
+    }
+}
+
+void ParticleFilter::update_echosounder(const double& beam, const double& beamVar, const double &z) {
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        OcTreeNode* search=bathyMap->search(particles.col(i)[0],particles.col(i)[1],z);
+        if(search!=NULL){
+            this->logWeights[i]+=search->getLogOdds();
+        }
+        else{
+            // Decide what to do when sonar hit free space
+            // Maybe cast a ray and then compute the error !
+        }
     }
 }

@@ -5,12 +5,17 @@
 
 #include <random>
 #include "../Eigen/Dense"
+#include <octomap/octomap.h>
+#include <octomap/OcTree.h>
 
 class ParticleFilter {
 private:
     std::default_random_engine generator;
     std::normal_distribution<double> distribution;
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
+    octomap::OcTree *bathyMap;
+    
+    double maxRange;
     
     bool lastTimeinit=false;
     double lastTime;
@@ -20,11 +25,7 @@ private:
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles;
     std::vector<double> logWeights;
 
-    Eigen::Vector2d computeMean();
-    Eigen::Matrix2d computeCovariance();
-
-    Eigen::Vector2d computeWeightedMean();
-    Eigen::Matrix2d computeWeightedCovariance();
+    void normalize();
     
     bool pointIsBetweenWalls(const Eigen::Vector2d &point);
     double getWallsRangeAt(const Eigen::Vector2d &point,const double &theta);
@@ -39,6 +40,8 @@ public:
     ParticleFilter();
     
     void init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d &initPosCov);
+    
+    void setMaxRange(const double &range);
     
     /**
      * 
@@ -70,22 +73,42 @@ public:
 
     /**
      * 
-     * @param beam
-     * @param beamVar
+     * @param beamRange
+     * @param beamRangeVar
+     * @param beamAngle angle, from the EAST of the GLOBAL FRAME, in trigonometric direction, in DEGREES
+     * @param z depth of the robot. Negative means robot is underwater.
      */
-    void update_sonar(const double &beam, const double &beamVar);
+    void update_sonar_horizontal(const double &beamRange, const double &beamRangeVar, const double &beamAngle, const double &z);
 
+    /**
+     * 
+     * @param beamRange
+     * @param beamRangeVar
+     * @param beamAngle angle of the beam in DEGREES. 0 Means the beam is parallel to the water, on the right of the robot. 180 Means the beam is parallel to the water, on the left of the robot. 90 Means the beams is at the nadir.
+     * @param robotYaw yaw of the robot, in DEGREES, counting 0 from east, in a trigonometric fashion.
+     * @param z
+     */
+    void update_sonar_vertical(const double &beamRange, const double &beamRangeVar, const double &beamAngle, const double &robotYaw, const double &z);
+    
     /**
      * 
      * @param beam
      * @param beamVar
+     * @param z depth of the robot. Negative means robot is underwater.
      */
-    void update_echosounder(const double &beam, const double &beamVar);
+    void update_echosounder(const double &beam, const double &beamVar, const double &z);
     
     /**
      * Uses Low-variance resampling method
      */
     void resample();
+    
+    Eigen::Vector2d computeMean();
+    Eigen::Matrix2d computeCovariance();
+
+    Eigen::Vector2d computeWeightedMean();
+    Eigen::Matrix2d computeWeightedCovariance();
+    
 };
 
 #endif // PARTICLE_FILTER_H

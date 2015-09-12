@@ -16,6 +16,21 @@ void ParticleFilter::normalize()
 {
     // Get the highest likelyhood
     double max=*max_element(logWeights.begin(),logWeights.end());
+    
+    // Using the log-sum of exponentials transform to avoid overflow
+    // cf: http://lingpipe-blog.com/2009/06/25/log-sum-of-exponentials/
+    double sumExp=0;
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        sumExp+=exp(logWeights[i]);
+    }
+    
+    double logSumExp=max+log(sumExp);
+    
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        logWeights-=logSumExp;
+    }
 }
 
 //*****************************************

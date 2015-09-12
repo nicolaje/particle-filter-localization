@@ -195,3 +195,15 @@ void ParticleFilter::resample()
     memcpy(&logWeights[0],&logWeights[0],sizeof(double)*PARTICLE_NUMBER);
     //logWeights=logWeightsSwap;
 }
+
+Vector2d ParticleFilter::computeMean()
+{
+    return particles.rowwise().mean();
+}
+
+Matrix2d ParticleFilter::computeCovariance()
+{
+    Matrix<double,2,PARTICLE_NUMBER> centered=particles.colwise()-particles.rowwise().mean();
+    Matrix2d prod=centered.transpose()*centered;
+    return (prod)/double(particles.cols()-1);
+}

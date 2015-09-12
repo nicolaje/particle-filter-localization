@@ -6,6 +6,7 @@ using namespace octomap;
 
 ParticleFilter::ParticleFilter() {
     this->distribution = std::normal_distribution<double>(0, 1);
+    this->uniformDistribution=std::uniform_real_distribution<double>(0,1);
 }
 
 //*****************************************
@@ -15,7 +16,14 @@ ParticleFilter::ParticleFilter() {
 void ParticleFilter::normalize()
 {
     // Get the highest likelyhood
-    double max=*max_element(logWeights.begin(),logWeights.end());
+    double maxLW=logWeights[0];
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        if(logWeights[1]>maxLW)
+        {
+            maxLW=logWeights[i];
+        }
+    }
     
     // Using the log-sum of exponentials transform to avoid overflow
     // cf: http://lingpipe-blog.com/2009/06/25/log-sum-of-exponentials/
@@ -25,11 +33,11 @@ void ParticleFilter::normalize()
         sumExp+=exp(logWeights[i]);
     }
     
-    double logSumExp=max+log(sumExp);
+    double logSumExp=maxLW+log(sumExp);
     
     for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
     {
-        logWeights-=logSumExp;
+        logWeights[i]-=logSumExp;
     }
 }
 
@@ -116,7 +124,7 @@ void ParticleFilter::update_sonar_vertical(const double& beamRange, const double
             this->logWeights[i]+=search->getLogOdds();
         }
         else{
-            // Decide what to do when sonar hit free space
+            // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
         }
     }
@@ -132,7 +140,7 @@ void ParticleFilter::update_sonar_horizontal(const double& beamRange, const doub
             this->logWeights[i]+=search->getLogOdds();
         }
         else{
-            // Decide what to do when sonar hit free space
+            // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
         }
     }
@@ -146,8 +154,44 @@ void ParticleFilter::update_echosounder(const double& beam, const double& beamVa
             this->logWeights[i]+=search->getLogOdds();
         }
         else{
-            // Decide what to do when sonar hit free space
+            // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
         }
     }
+}
+
+void ParticleFilter::resample()
+{
+    // Draw PARTICLE_NUMBER uniformly distributed number between 0,1 and compute their log
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        uniforms[i]=uniformDistribution(generator);
+    }
+    
+    // For each logUniform, compute the cumulative sum of the weights
+    // and stop when the logUniform value is reached: keep this particle
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        double cumSumTarget=uniforms[i];
+        double cumSum = 0;
+        unsigned int j=0;
+        for(j=0;j<PARTICLE_NUMBER+1&&cumSum<cumSumTarget;j++)
+        {
+            cumSum+=exp(logWeights[j]);
+        }
+        if(j==PARTICLE_NUMBER)
+        {
+            cout << "Problem!"<<endl;
+            exit(EXIT_FAILURE);
+            // Find a smarter way to admit things went wrong
+        }
+        else{
+            particlesSwap.col(i)=particles.col(j);
+            logWeightsSwap[i]=logWeights[j];
+        }
+    }
+    
+    particles=particlesSwap;
+    memcpy(&logWeights[0],&logWeights[0],sizeof(double)*PARTICLE_NUMBER);
+    //logWeights=logWeightsSwap;
 }

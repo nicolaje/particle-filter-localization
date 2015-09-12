@@ -12,6 +12,7 @@ class ParticleFilter {
 private:
     std::default_random_engine generator;
     std::normal_distribution<double> distribution;
+    std::uniform_real_distribution<double> uniformDistribution;
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
     octomap::OcTree *bathyMap;
     
@@ -23,8 +24,13 @@ private:
     std::vector<std::pair<double, double> > wallsPolygon;
     
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles;
-    std::vector<double> logWeights;
-
+    double logWeights[PARTICLE_NUMBER];
+    
+    Eigen::Matrix<double, 2, PARTICLE_NUMBER> particlesSwap;
+    double logWeightsSwap[PARTICLE_NUMBER];
+    
+    double uniforms[PARTICLE_NUMBER];
+    
     void normalize();
     
     bool pointIsBetweenWalls(const Eigen::Vector2d &point);

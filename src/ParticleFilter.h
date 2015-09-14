@@ -118,6 +118,9 @@ public:
 
     ParticleFilter();
 
+    Eigen::Matrix<double, 2, PARTICLE_NUMBER> &getParticles();
+    
+    
     void init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d &initPosCov);
 
     bool isInitialized();

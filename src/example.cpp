@@ -62,6 +62,14 @@ int main(int argc, char** argv) {
         Matrix2d cov=pf.computeCovariance();
         
         vibes::clearGroup("particles");
+        
+        
+        Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles=pf.getParticles();
+        for(unsigned int i=0;i<particles.cols();i++)
+        {
+            vibes::drawCircle(particles.col(i)[0],particles.col(i)[1],0.1,vibesParams("group","particles"));
+        }
+        
         vibes::drawCircle(mean[0], mean[1], 1, vibesParams("group", "particles", "color", "black[red]"));
         
         vibes::drawConfidenceEllipse(mean[0],mean[1],cov(0,0),cov(0,1),cov(1,1),3,vibesParams("group","particles", "color","red"));

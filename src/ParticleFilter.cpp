@@ -11,6 +11,11 @@ ParticleFilter::ParticleFilter() {
     this->lastTime = false;
 }
 
+Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles()
+{
+    return particles;
+}
+
 //*****************************************
 // Private methods
 //*****************************************
@@ -91,9 +96,9 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
         this->lastTimeinit = true;
     } else {
         double dt = t - this->lastTime;
-        
-        double vRand=sqrt(uCov(0,0))*distribution(generator);
-        double thetaRand=sqrt(uCov(1,1))*distribution(generator);
+        cout << "dt: "<<dt<<endl;
+        double vRand=sqrt(uCov(0,0))*distribution(generator)*u(0);
+        double thetaRand=sqrt(uCov(1,1))*distribution(generator)+u(1);
         
         Vector2d dX;
         // TODO: parallelize this loop

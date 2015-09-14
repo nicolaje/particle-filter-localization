@@ -6,40 +6,35 @@ using namespace octomap;
 
 ParticleFilter::ParticleFilter() {
     this->distribution = std::normal_distribution<double>(0, 1);
-    this->uniformDistribution=std::uniform_real_distribution<double>(0,1);
-    this->isInit=false;
-    this->lastTime=false;
+    this->uniformDistribution = std::uniform_real_distribution<double>(0, 1);
+    this->isInit = false;
+    this->lastTime = false;
 }
 
 //*****************************************
 // Private methods
 //*****************************************
 
-void ParticleFilter::normalize()
-{
+void ParticleFilter::normalize() {
     // Get the highest likelyhood
-    double maxLW=logWeights[0];
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        if(logWeights[1]>maxLW)
-        {
-            maxLW=logWeights[i];
+    double maxLW = logWeights[0];
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        if (logWeights[1] > maxLW) {
+            maxLW = logWeights[i];
         }
     }
-    
+
     // Using the log-sum of exponentials transform to avoid overflow
     // cf: http://lingpipe-blog.com/2009/06/25/log-sum-of-exponentials/
-    double sumExp=0;
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        sumExp+=exp(logWeights[i]);
+    double sumExp = 0;
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        sumExp += exp(logWeights[i]);
     }
-    
-    double logSumExp=maxLW+log(sumExp);
-    
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        logWeights[i]-=logSumExp;
+
+    double logSumExp = maxLW + log(sumExp);
+
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        logWeights[i] -= logSumExp;
     }
 }
 
@@ -53,13 +48,12 @@ void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d 
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         this->particles.col(i) = initPositions[i];
     }
-    this->isInit=true;
+    this->isInit = true;
 }
 
 bool ParticleFilter::isInitialized() {
     return this->isInit;
 }
-
 
 void ParticleFilter::setMaxRange(const double& range) {
     this->maxRange = range;
@@ -109,6 +103,20 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
     this->lastTime = t;
 }
 
+void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const double &alpha, const double &alphaVar, const double &theta, const double &thetaVar) {
+    double rhoLocal, alphaLocal,dist,err_sqr;
+    double log_inv_sqrt = -0.5*2.5066282746310002 * sqrt(rhoVar);
+    double inv_var = 1./(2*rhoVar);
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        rhoLocal = rho + sqrt(rhoVar) * distribution(generator);
+        alphaLocal = alpha + sqrt(alphaVar) * distribution(generator);
+        dist=getWallsRangeAt(particles.col(i),theta,alpha);
+        err_sqr = pow(dist-rho,2);
+        
+        logWeights[i]+=log_inv_sqrt-err_sqr*inv_var;
+    }
+}
+
 void ParticleFilter::update_range(const Vector2d &emitterPos, const double& range, const double& rangeVar) {
     double log_inv_sqrt = -0.5 * 2.5066282746310002 * sqrt(rangeVar);
     double inv_var = 1. / (2 * rangeVar);
@@ -120,18 +128,15 @@ void ParticleFilter::update_range(const Vector2d &emitterPos, const double& rang
     }
 }
 
-void ParticleFilter::update_sonar_vertical(const double& beamRange, const double& beamRangeVar, const double& beamAngle, const double& robotYaw, const double& z)
-{
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        double xEnd=particles.col(i)[0]+beamRange*cos(robotYaw*M_PI/180)*cos(beamAngle*M_PI/180);
-        double yEnd=particles.col(i)[1]+beamRange*sin(robotYaw*M_PI/180)*cos(beamAngle*M_PI/180);
-        double zEnd=z+beamRange*sin(beamAngle*M_PI/180);
+void ParticleFilter::update_sonar_vertical(const double& beamRange, const double& beamRangeVar, const double& beamAngle, const double& robotYaw, const double& z) {
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        double xEnd = particles.col(i)[0] + beamRange * cos(robotYaw * M_PI / 180) * cos(beamAngle * M_PI / 180);
+        double yEnd = particles.col(i)[1] + beamRange * sin(robotYaw * M_PI / 180) * cos(beamAngle * M_PI / 180);
+        double zEnd = z + beamRange * sin(beamAngle * M_PI / 180);
         OcTreeNode* search = bathyMap->search(xEnd, yEnd, z);
         if (search != NULL) {
-            this->logWeights[i]+=search->getLogOdds();
-        }
-        else{
+            this->logWeights[i] += search->getLogOdds();
+        } else {
             // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
         }
@@ -145,78 +150,66 @@ void ParticleFilter::update_sonar_horizontal(const double& beamRange, const doub
         double zEnd = z;
         OcTreeNode* search = bathyMap->search(xEnd, yEnd, z);
         if (search != NULL) {
-            this->logWeights[i]+=search->getLogOdds();
-        }
-        else{
+            this->logWeights[i] += search->getLogOdds();
+        } else {
             // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
         }
     }
 }
 
-void ParticleFilter::update_GPS(const double& n, const double& nVar, const double& e, const double& eVar)
-{
-    
+void ParticleFilter::update_GPS(const double& n, const double& nVar, const double& e, const double& eVar) {
+
 }
 
 void ParticleFilter::update_echosounder(const double& beam, const double& beamVar, const double &z) {
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        OcTreeNode* search=bathyMap->search(particles.col(i)[0],particles.col(i)[1],z);
-        if(search!=NULL){
-            this->logWeights[i]+=search->getLogOdds();
-        }
-        else{
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        OcTreeNode* search = bathyMap->search(particles.col(i)[0], particles.col(i)[1], z);
+        if (search != NULL) {
+            this->logWeights[i] += search->getLogOdds();
+        } else {
             // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
         }
     }
 }
 
-void ParticleFilter::resample()
-{
+void ParticleFilter::resample() {
     // Draw PARTICLE_NUMBER uniformly distributed number between 0,1 and compute their log
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        uniforms[i]=uniformDistribution(generator);
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        uniforms[i] = uniformDistribution(generator);
     }
-    
+
     // For each logUniform, compute the cumulative sum of the weights
     // and stop when the logUniform value is reached: keep this particle
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        double cumSumTarget=uniforms[i];
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        double cumSumTarget = uniforms[i];
         double cumSum = 0;
-        unsigned int j=0;
-        for(j=0;j<PARTICLE_NUMBER+1&&cumSum<cumSumTarget;j++)
-        {
-            cumSum+=exp(logWeights[j]);
+        unsigned int j = 0;
+        for (j = 0; j < PARTICLE_NUMBER + 1 && cumSum < cumSumTarget; j++) {
+            cumSum += exp(logWeights[j]);
         }
-        if(j==PARTICLE_NUMBER)
-        {
-            cout << "Problem!"<<endl;
+        if (j == PARTICLE_NUMBER) {
+            cout << "Problem!" << endl;
             exit(EXIT_FAILURE);
             // Find a smarter way to admit things went wrong
-        }
-        else{
-            particlesSwap.col(i)=particles.col(j);
-            logWeightsSwap[i]=logWeights[j];
+        } else {
+            particlesSwap.col(i) = particles.col(j);
+            logWeightsSwap[i] = logWeights[j];
         }
     }
-    
-    particles=particlesSwap;
-    memcpy(&logWeights[0],&logWeights[0],sizeof(double)*PARTICLE_NUMBER);
+
+    particles = particlesSwap;
+    memcpy(&logWeights[0], &logWeights[0], sizeof (double)*PARTICLE_NUMBER);
     //logWeights=logWeightsSwap;
 }
 
-Vector2d ParticleFilter::computeMean()
-{
+Vector2d ParticleFilter::computeMean() {
     return particles.rowwise().mean();
 }
 
-Matrix2d ParticleFilter::computeCovariance()
-{
-    Matrix<double,2,PARTICLE_NUMBER> centered=particles.colwise()-particles.rowwise().mean();
-    Matrix2d prod=centered.transpose()*centered;
-    return (prod)/double(particles.cols()-1);
+Matrix2d ParticleFilter::computeCovariance() {
+    Matrix<double, 2, PARTICLE_NUMBER> centered = particles.colwise() - particles.rowwise().mean();
+    Matrix2d prod = centered.transpose() * centered;
+    return (prod) / double(particles.cols() - 1);
 }

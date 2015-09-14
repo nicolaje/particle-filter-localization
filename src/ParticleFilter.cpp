@@ -7,6 +7,8 @@ using namespace octomap;
 ParticleFilter::ParticleFilter() {
     this->distribution = std::normal_distribution<double>(0, 1);
     this->uniformDistribution=std::uniform_real_distribution<double>(0,1);
+    this->isInit=false;
+    this->lastTime=false;
 }
 
 //*****************************************
@@ -51,7 +53,13 @@ void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d 
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         this->particles.col(i) = initPositions[i];
     }
+    this->isInit=true;
 }
+
+bool ParticleFilter::isInitialized() {
+    return this->isInit;
+}
+
 
 void ParticleFilter::setMaxRange(const double& range) {
     this->maxRange = range;
@@ -144,6 +152,11 @@ void ParticleFilter::update_sonar_horizontal(const double& beamRange, const doub
             // Maybe cast a ray and then compute the error !
         }
     }
+}
+
+void ParticleFilter::update_GPS(const double& n, const double& nVar, const double& e, const double& eVar)
+{
+    
 }
 
 void ParticleFilter::update_echosounder(const double& beam, const double& beamVar, const double &z) {

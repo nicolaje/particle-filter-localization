@@ -7,12 +7,12 @@
 using namespace Eigen;
 using namespace std;
 
-int main(int argc, char** argv){
+int main(int argc, char** argv) {
 
     // Set Vibes Params
     vibes::beginDrawing();
     vibes::newFigure("test");
-    vibes::setFigureProperties("test", vibesParams("x",0,"y",0,"width",1000,"height",1000 ));
+    vibes::setFigureProperties("test", vibesParams("x", 0, "y", 0, "width", 1000, "height", 1000));
     vibes::axisLimits(-10, 140, -10, 140);
 
     // Intantiare the simulator xith the map
@@ -23,40 +23,53 @@ int main(int argc, char** argv){
     // Intantiate Localizer object
     ParticleFilter pf;
     Pose &p0 = simu.currentPose();
-    
-    Vector2d p(p0.x,p0.y);
-    Matrix2d pCov=Matrix2d::Identity()*0.01;
-    pf.init(p,pCov);
+
+    Vector2d p(p0.x, p0.y);
+    Matrix2d pCov = Matrix2d::Identity()*0.01;
+    pf.init(p, pCov);
+    cout << "pos init: "<<endl<<p<<endl;
     /*localizer.setInitialPosition(p0.x, p0.y, p0.t);
     localizer.setSpeedNoise(0.02);
     localizer.setHeadingNoise(2*M_PI/180.);
     localizer.setBufferSize(20);
     localizer.setNOutliers(5);*/
-simu.drawMap();
-vibes::newGroup("greenlines","green");
-vibes::newGroup("redlines","red");
+    simu.drawMap();
+    vibes::newGroup("greenlines", "green");
+    vibes::newGroup("redlines", "red");
 
-vibes::newGroup("AUV",vibesParams("color","black"));
-    while( simu.nextStep() != -1){
+    vibes::newGroup("particles", vibesParams("color", "red"));
+
+    vibes::newGroup("AUV", vibesParams("color", "black"));
+    while (simu.nextStep() != -1) {
 
         // Current point of the trajectory
         Pose &p = simu.currentPose();
 
         // Draw the current situation
         //vibes::clearFigure("test");
-        
+
         vibes::clearGroup("AUV");
-        vibes::drawAUV(p.x, p.y, p.theta*180/M_PI, 1,vibesParams("group","AUV"));
-        Eigen::Vector2d u(p.speed,p.theta);
-        Eigen::Matrix2d uCov=Matrix2d::Identity()*0.1;
-        pf.predict(p.t,u,uCov);
+        vibes::drawAUV(p.x, p.y, p.theta * 180 / M_PI, 1, vibesParams("group", "AUV"));
+        Eigen::Vector2d u(10/*p.speed*/, 0/*p.theta*/);
+        Eigen::Matrix2d uCov = Matrix2d::Identity()*0.1;
+        pf.predict(p.t, u, uCov);
         //localizer.predict(p.speed, p.theta, p.t);
 
         double d = simu.genSonarDist(p.x, p.y, p.theta, p.t);
-        cout << "range: "<<d<<endl;
-        if( d >= 0){ // the measurment is valid
+        cout << "range: " << d << endl;
+        Vector2d mean = pf.computeMean();
+        
+        Matrix2d cov=pf.computeCovariance();
+        
+        vibes::clearGroup("particles");
+        vibes::drawCircle(mean[0], mean[1], 1, vibesParams("group", "particles", "color", "black[red]"));
+        
+        vibes::drawConfidenceEllipse(mean[0],mean[1],cov(0,0),cov(0,1),cov(1,1),3,vibesParams("group","particles", "color","red"));
+        if (d >= 0) { // the measurment is valid
             double alpha = simu.getSonarAngle(p.t) + p.theta; // sonar beam angle
-            cout << "beam angle: "<<alpha<<endl;
+            cout << "beam angle: " << alpha << endl;
+
+
             //Interval ialpha = Interval(alpha).inflate(2*M_PI/180.0);
             //Interval irho = Interval(d).inflate(0.2);
             //localizer.update(irho, ialpha, p.t);

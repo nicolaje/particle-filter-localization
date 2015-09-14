@@ -91,11 +91,16 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
         this->lastTimeinit = true;
     } else {
         double dt = t - this->lastTime;
-        vector<VectorXd> inputs = this->drawSamples(PARTICLE_NUMBER, u, uCov);
-
+        
+        double vRand=sqrt(uCov(0,0))*distribution(generator);
+        double thetaRand=sqrt(uCov(1,1))*distribution(generator);
+        
+        Vector2d dX;
         // TODO: parallelize this loop
         for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-            Vector2d dX(dt * inputs[i](0) * cos(inputs[i](1) * M_PI / 180.), dt * inputs[i](0) * sin(inputs[i](1) * M_PI / 180.));
+            dX<<
+                    dt * vRand * cos(thetaRand * M_PI / 180.),
+                    dt * vRand * sin(thetaRand * M_PI / 180.);
             this->particles.col(i) += dX;
         }
     }
@@ -210,6 +215,6 @@ Vector2d ParticleFilter::computeMean() {
 
 Matrix2d ParticleFilter::computeCovariance() {
     Matrix<double, 2, PARTICLE_NUMBER> centered = particles.colwise() - particles.rowwise().mean();
-    Matrix2d prod = centered.transpose() * centered;
+    Matrix2d prod = centered*centered.transpose();
     return (prod) / double(particles.cols() - 1);
 }

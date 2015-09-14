@@ -6,7 +6,7 @@ ADD_DEFINITIONS(
 
 FIND_PACKAGE(octomap REQUIRED)
 
-project(lif_particle_filter)
+project(lib_particle_filter)
 
 LIST(APPEND CMAKE_INCLUDE_PATH ${CMAKE_CURRENT_LIST_DIR}/Eigen)
 

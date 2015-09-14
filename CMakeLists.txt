@@ -14,3 +14,7 @@ LIST(APPEND CMAKE_INCLUDE_PATH ${CMAKE_CURRENT_LIST_DIR}/Eigen)
 
 ADD_LIBRARY(particle_filter SHARED src/ParticleFilter.cpp)
 TARGET_LINK_LIBRARIES(particle_filter octomap)
+
+
+ADD_EXECUTABLE(example src/example.cpp src/simulator.cpp src/ParticleFilter.cpp src/vibes.cpp src/simulator.h src/ParticleFilter.h src/vibes.h)
+TARGET_LINK_LIBRARIES(example particle_filter octomap)

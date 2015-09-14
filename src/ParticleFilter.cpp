@@ -5,10 +5,16 @@ using namespace std;
 using namespace octomap;
 
 ParticleFilter::ParticleFilter() {
+    generator.seed(100);
     this->distribution = std::normal_distribution<double>(0, 1);
     this->uniformDistribution = std::uniform_real_distribution<double>(0, 1);
     this->isInit = false;
     this->lastTime = false;
+    double logNorm=-log(PARTICLE_NUMBER);
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        logWeights[i]=logNorm;
+    }
 }
 
 Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles()
@@ -31,9 +37,9 @@ void ParticleFilter::normalize() {
 
     // Using the log-sum of exponentials transform to avoid overflow
     // cf: http://lingpipe-blog.com/2009/06/25/log-sum-of-exponentials/
-    double sumExp = 0;
-    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        sumExp += exp(logWeights[i]);
+    double sumExp = exp(logWeights[0]-maxLW);
+    for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
+        sumExp += exp(logWeights[i]-maxLW);
     }
 
     double logSumExp = maxLW + log(sumExp);
@@ -51,6 +57,7 @@ void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d 
     vector<VectorXd> initPositions = this->drawSamples(PARTICLE_NUMBER, initPos, initPosCov);
 
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        cout << "initPositions["<<i<<"]: "<<endl<<initPositions[i]<<endl;
         this->particles.col(i) = initPositions[i];
     }
     this->isInit = true;
@@ -77,7 +84,7 @@ VectorXd ParticleFilter::drawSample(const Eigen::VectorXd& mean, const Eigen::Ma
 
     // Cf: Robotics lesson
     this->solver = SelfAdjointEigenSolver<MatrixXd>(cov);
-    return this->solver.operatorSqrt() * VectorXd::NullaryExpr(mean.rows(), normal);
+    return mean+ this->solver.operatorSqrt() * VectorXd::NullaryExpr(mean.rows(), normal);
 }
 
 vector<VectorXd> ParticleFilter::drawSamples(const int& nbParticle, const VectorXd& mean, const MatrixXd& cov) {
@@ -96,16 +103,15 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
         this->lastTimeinit = true;
     } else {
         double dt = t - this->lastTime;
-        cout << "dt: "<<dt<<endl;
-        double vRand=sqrt(uCov(0,0))*distribution(generator)*u(0);
-        double thetaRand=sqrt(uCov(1,1))*distribution(generator)+u(1);
-        
+        double vRand;
+        double thetaRand;
         Vector2d dX;
-        // TODO: parallelize this loop
         for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+            vRand=sqrt(uCov(0,0))*distribution(generator)+u(0);
+            thetaRand=(sqrt(uCov(1,1))*distribution(generator)+u(1))*M_PI/180.;
             dX<<
-                    dt * vRand * cos(thetaRand * M_PI / 180.),
-                    dt * vRand * sin(thetaRand * M_PI / 180.);
+                    dt*vRand * cos(thetaRand),
+                    dt*vRand * sin(thetaRand);
             this->particles.col(i) += dX;
         }
     }
@@ -120,10 +126,12 @@ void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         rhoLocal = rho + sqrt(rhoVar) * distribution(generator);
         alphaLocal = alpha + sqrt(alphaVar) * distribution(generator);
-        dist=getWallsRangeAt(particles.col(i),theta,alpha);
+        dist=getWallsRangeAt(particles.col(i),theta*M_PI/2,alpha*M_PI/2);
         err_sqr = pow(dist-rho,2);
-        
+        cout << "logWeights["<<i<<"] avant: "<<logWeights[i]<<endl;
         logWeights[i]+=log_inv_sqrt-err_sqr*inv_var;
+        cout << "logWeights["<<i<<"] apres: "<<logWeights[i]<<endl;
+        cout << "Pour une erreur de : "<<sqrt(err_sqr)<<endl;
     }
 }
 
@@ -185,6 +193,7 @@ void ParticleFilter::update_echosounder(const double& beam, const double& beamVa
 }
 
 void ParticleFilter::resample() {
+    normalize();
     // Draw PARTICLE_NUMBER uniformly distributed number between 0,1 and compute their log
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         uniforms[i] = uniformDistribution(generator);
@@ -196,19 +205,24 @@ void ParticleFilter::resample() {
         double cumSumTarget = uniforms[i];
         double cumSum = 0;
         unsigned int j = 0;
-        for (j = 0; j < PARTICLE_NUMBER + 1 && cumSum < cumSumTarget; j++) {
+        
+        for (j = 0; j < PARTICLE_NUMBER  && cumSum < cumSumTarget; j++) {
             cumSum += exp(logWeights[j]);
         }
         if (j == PARTICLE_NUMBER) {
             cout << "Problem!" << endl;
+            cout << "CumSum: "<<cumSum<<endl;
+            cout << "CumSumTarget: "<<cumSumTarget<<endl;
             exit(EXIT_FAILURE);
             // Find a smarter way to admit things went wrong
         } else {
+            cout << "i: "<<i<<", j: "<<j<<endl;
+            cout << "particlesSwap.cols(): "<<particlesSwap.cols()<<", particlesSwap.rows()"<<particlesSwap.cols()<<endl;
+            cout << "particles.cols(): "<<particles.cols()<<", particles.rows()"<<particles.cols()<<endl;
             particlesSwap.col(i) = particles.col(j);
             logWeightsSwap[i] = logWeights[j];
         }
     }
-
     particles = particlesSwap;
     memcpy(&logWeights[0], &logWeights[0], sizeof (double)*PARTICLE_NUMBER);
     //logWeights=logWeightsSwap;

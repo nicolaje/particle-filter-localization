@@ -1,7 +1,7 @@
 #ifndef PARTICLE_FILTER_H
 #define PARTICLE_FILTER_H
 
-#define PARTICLE_NUMBER 500 // Number of particles
+#define PARTICLE_NUMBER 2 // Number of particles
 
 #include <random>
 #include "../Eigen/Dense"
@@ -86,7 +86,7 @@ inline double getWallsRangeAt(const Eigen::Vector2d &point, const double &theta,
         {
             Wall &w=walls[j];
             double dj,phij;
-            CalcDistanceDirSegment(dj,phij,point[0],point[1],theta,w[0],w[1],w[2],w[3]);
+            CalcDistanceDirSegment(dj,phij,point[0],point[1],phi,w[0],w[1],w[2],w[3]);
             dist = (dj < dist) ? dj : dist;
         }
     return dist;

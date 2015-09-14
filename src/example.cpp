@@ -3,6 +3,7 @@
 #include "ParticleFilter.h"
 #include "../Eigen/Dense"
 #include <unistd.h>
+#include <cmath>
 
 using namespace Eigen;
 using namespace std;
@@ -25,7 +26,8 @@ int main(int argc, char** argv) {
     Pose &p0 = simu.currentPose();
 
     Vector2d p(p0.x, p0.y);
-    Matrix2d pCov = Matrix2d::Identity()*0.01;
+    Matrix2d pCov = Matrix2d::Identity();
+    
     pf.init(p, pCov);
     cout << "pos init: "<<endl<<p<<endl;
     /*localizer.setInitialPosition(p0.x, p0.y, p0.t);
@@ -50,34 +52,34 @@ int main(int argc, char** argv) {
 
         vibes::clearGroup("AUV");
         vibes::drawAUV(p.x, p.y, p.theta * 180 / M_PI, 1, vibesParams("group", "AUV"));
-        Eigen::Vector2d u(10/*p.speed*/, 0/*p.theta*/);
-        Eigen::Matrix2d uCov = Matrix2d::Identity()*0.1;
+        Eigen::Vector2d u(p.speed, p.theta*180/M_PI);
+        Eigen::Matrix2d uCov = Matrix2d::Identity();
+        uCov(0,0)=1;//pow(0.2/3,2);
+        uCov(1,1)=pow(6./3,2);
+    
         pf.predict(p.t, u, uCov);
         //localizer.predict(p.speed, p.theta, p.t);
 
         double d = simu.genSonarDist(p.x, p.y, p.theta, p.t);
-        cout << "range: " << d << endl;
+        
         Vector2d mean = pf.computeMean();
         
         Matrix2d cov=pf.computeCovariance();
         
         vibes::clearGroup("particles");
         
-        
         Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles=pf.getParticles();
-        for(unsigned int i=0;i<particles.cols();i++)
+        for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
         {
-            vibes::drawCircle(particles.col(i)[0],particles.col(i)[1],0.1,vibesParams("group","particles"));
+            vibes::drawCircle(particles.col(i)[0],particles.col(i)[1],0.01,vibesParams("group","particles"));
         }
-        
-        vibes::drawCircle(mean[0], mean[1], 1, vibesParams("group", "particles", "color", "black[red]"));
         
         vibes::drawConfidenceEllipse(mean[0],mean[1],cov(0,0),cov(0,1),cov(1,1),3,vibesParams("group","particles", "color","red"));
         if (d >= 0) { // the measurment is valid
             double alpha = simu.getSonarAngle(p.t) + p.theta; // sonar beam angle
             cout << "beam angle: " << alpha << endl;
-
-
+            pf.update_walls(d,1,alpha,1,p.theta,1);
+            pf.resample();
             //Interval ialpha = Interval(alpha).inflate(2*M_PI/180.0);
             //Interval irho = Interval(d).inflate(0.2);
             //localizer.update(irho, ialpha, p.t);

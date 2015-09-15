@@ -28,9 +28,9 @@ int main(int argc, char** argv) {
 
     Vector2d p(p0.x, p0.y);
     Matrix2d pCov = Matrix2d::Identity();
-    
+
     pf.init(p, pCov);
-    cout << "pos init: "<<endl<<p<<endl;
+    cout << "pos init: " << endl << p << endl;
     /*localizer.setInitialPosition(p0.x, p0.y, p0.t);
     localizer.setSpeedNoise(0.02);
     localizer.setHeadingNoise(2*M_PI/180.);
@@ -43,49 +43,51 @@ int main(int argc, char** argv) {
     vibes::newGroup("particles", vibesParams("color", "red"));
 
     vibes::newGroup("AUV", vibesParams("color", "black"));
-    
-    int reSample=0;
+
+    int reSample = 0;
     while (simu.nextStep() != -1) {
         reSample++;
-        
+
         // Current point of the trajectory
         Pose &p = simu.currentPose();
 
         // Draw the current situation
         //vibes::clearFigure("test");
 
-        vibes::clearGroup("AUV");
-        vibes::drawAUV(p.x, p.y, p.theta * 180 / M_PI, 1, vibesParams("group", "AUV"));
-        Eigen::Vector2d u(p.speed, p.theta*180/M_PI);
+        Eigen::Vector2d u(p.speed, p.theta * 180 / M_PI);
         Eigen::Matrix2d uCov = Matrix2d::Identity();
-        uCov(0,0)=1;//pow(0.2/3,2);
-        uCov(1,1)=pow(6./3,2);
-    
+        uCov(0, 0) = 1 * 1; //pow(0.2/3,2);
+        uCov(1, 1) = 7 * 7; //pow(6. / 3, 2);
+
         pf.predict(p.t, u, uCov);
-        
-        Vector2d mean = pf.computeMean();
-        Matrix2d cov=pf.computeCovariance();
-        
-        vibes::clearGroup("particles");
-        
-        Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles=pf.getParticles();
-        for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-        {
-            vibes::drawCircle(particles.col(i)[0],particles.col(i)[1],0.01,vibesParams("group","particles"));
-        }
-        
-        //vibes::drawConfidenceEllipse(mean[0],mean[1],cov(0,0),cov(0,1),cov(1,1),3,vibesParams("group","particles", "color","red"));
-        
+
         double d = simu.genSonarDist(p.x, p.y, p.theta, p.t);
         if (d >= 0) { // the measurment is valid
+            vibes::clearGroup("particles");
+
+            Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles = pf.getParticles();
+            for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+                vibes::drawCircle(particles.col(i)[0], particles.col(i)[1], 0.01, vibesParams("group", "particles"));
+            }
             double alpha = simu.getSonarAngle(p.t) + p.theta; // sonar beam angle
-            pf.update_walls(d,25,alpha,1);
-            if(reSample%100==0)
-                pf.resample();
+            pf.update_walls(d, 25, alpha, 1);
+
+            
+                pf.resampleResidual();
             //Interval ialpha = Interval(alpha).inflate(2*M_PI/180.0);
             //Interval irho = Interval(d).inflate(0.2);
             //localizer.update(irho, ialpha, p.t);
+            Vector2d mean = pf.computeMean();
+            Matrix2d cov = pf.computeCovariance();
+            vibes::drawConfidenceEllipse(mean[0], mean[1], cov(0, 0), cov(0, 1), cov(1, 1), 3, vibesParams("group", "particles", "color", "red"));
+            vibes::drawCircle(mean[0], mean[1], 5, vibesParams("group", "particles", "color", "red"));
+
+            Vector2d wMean = pf.computeWeightedMean();
+            vibes::drawCircle(wMean[0], wMean[1], 5, vibesParams("group", "particles", "color", "red"));
+
         }
+        vibes::clearGroup("AUV");
+        vibes::drawAUV(p.x, p.y, p.theta * 180 / M_PI, 1, vibesParams("group", "AUV"));
 
         // Draw Results
         // Current position with corrections

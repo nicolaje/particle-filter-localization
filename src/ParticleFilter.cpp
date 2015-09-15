@@ -3,6 +3,7 @@
 using namespace Eigen;
 using namespace std;
 using namespace octomap;
+int blah=0;
 
 ParticleFilter::ParticleFilter() {
     generator.seed(100);
@@ -10,32 +11,29 @@ ParticleFilter::ParticleFilter() {
     this->uniformDistribution = std::uniform_real_distribution<double>(0, 1);
     this->isInit = false;
     this->lastTime = false;
-    double norm=1./PARTICLE_NUMBER;
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        weights[i]=norm;
+    double norm = 1. / PARTICLE_NUMBER;
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        weights[i] = norm;
     }
 }
 
-void ParticleFilter::setWallsFile(const std::string &filePath)
-{
+void ParticleFilter::setWallsFile(const std::string &filePath) {
     std::ifstream in_file;
     in_file.open(filePath, ios::in);
-    if(in_file.fail()) {
+    if (in_file.fail()) {
         std::stringstream s;
         s << "Simulator [load]: cannot open file " << filePath << "for reading the map";
         std::cerr << s.str() << std::endl;
         exit(-1);
     }
     Wall wall;
-    while(in_file >> wall){
+    while (in_file >> wall) {
         walls.push_back(wall);
     }
     in_file.close();
 }
 
-Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles()
-{
+Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles() {
     return particles;
 }
 
@@ -44,34 +42,13 @@ Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles()
 //*****************************************
 
 void ParticleFilter::normalize() {
-    // Get the highest likelyhood
-    //double maxLW = logWeights[0];
-    //for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-    //    if (logWeights[1] > maxLW) {
-    //        maxLW = logWeights[i];
-    //    }
-    //}
-
-    // Using the log-sum of exponentials transform to avoid overflow
-    // cf: http://lingpipe-blog.com/2009/06/25/log-sum-of-exponentials/
-    //double sumExp = exp(logWeights[0]-maxLW);
-    //for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
-    //    sumExp += exp(logWeights[i]-maxLW);
-    //}
-
-    //double logSumExp = maxLW + log(sumExp);
-
-    //for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-    //    logWeights[i] -= logSumExp;
-    //}
-    double sumW=weights[0];
-    for(unsigned int i=1;i<PARTICLE_NUMBER;i++)
-    {
-        sumW+=weights[i];
+    double sumW = weights[0];
+    for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
+        sumW += weights[i];
     }
-    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
-    {
-        weights[i]/=sumW;
+    cout << "debug"<<endl;
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        weights[i] /= sumW;
     }
 }
 
@@ -109,7 +86,7 @@ VectorXd ParticleFilter::drawSample(const Eigen::VectorXd& mean, const Eigen::Ma
 
     // Cf: Robotics lesson
     this->solver = SelfAdjointEigenSolver<MatrixXd>(cov);
-    return mean+ this->solver.operatorSqrt() * VectorXd::NullaryExpr(mean.rows(), normal);
+    return mean + this->solver.operatorSqrt() * VectorXd::NullaryExpr(mean.rows(), normal);
 }
 
 vector<VectorXd> ParticleFilter::drawSamples(const int& nbParticle, const VectorXd& mean, const MatrixXd& cov) {
@@ -123,17 +100,15 @@ vector<VectorXd> ParticleFilter::drawSamples(const int& nbParticle, const Vector
     return res;
 }
 
-double ParticleFilter::getWallsRangeAt(const Eigen::Vector2d &point, const double &theta)
-{
-    double dist=1000;
-    
-    for(unsigned int j=0;j<walls.size();j++)
-        {
-            Wall &w=walls[j];
-            double dj,phij;
-            CalcDistanceDirSegment(dj,phij,point[0],point[1],theta,w[0],w[1],w[2],w[3]);
-            dist = (dj < dist) ? dj : dist;
-        }
+double ParticleFilter::getWallsRangeAt(const Eigen::Vector2d &point, const double &theta) {
+    double dist = 1000;
+
+    for (unsigned int j = 0; j < walls.size(); j++) {
+        Wall &w = walls[j];
+        double dj, phij;
+        CalcDistanceDirSegment(dj, phij, point[0], point[1], theta, w[0], w[1], w[2], w[3]);
+        dist = (dj < dist) ? dj : dist;
+    }
     return dist;
 }
 
@@ -146,11 +121,11 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
         double thetaRand;
         Vector2d dX;
         for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-            vRand=sqrt(uCov(0,0))*distribution(generator)+u(0);
-            thetaRand=(sqrt(uCov(1,1))*distribution(generator)+u(1))*M_PI/180.;
-            dX<<
-                    dt*vRand * cos(thetaRand),
-                    dt*vRand * sin(thetaRand);
+            vRand = sqrt(uCov(0, 0)) * distribution(generator) + u(0);
+            thetaRand = (sqrt(uCov(1, 1)) * distribution(generator) + u(1)) * M_PI / 180.;
+            dX <<
+                    dt * vRand * cos(thetaRand),
+                    dt * vRand * sin(thetaRand);
             this->particles.col(i) += dX;
         }
     }
@@ -159,15 +134,20 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
 }
 
 void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const double &alpha, const double &alphaVar) {
-    double rhoLocal, dist,err_sqr;
-    double inv_sqrt = 1/sqrt(rhoVar*2*M_PI);
-    double inv_var = 1./(2*rhoVar);
-    std::cout<<"update_walls"<<std::endl;
+    double rhoLocal, dist, err_sqr;
+    double inv_sqrt = 1 / sqrt(rhoVar * 2 * M_PI);
+    double inv_var = 1. / (2 * rhoVar);
+    if(blah>=84)
+    {
+        cout << "debug me"<<endl;
+    }
+    this->normalize();
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        rhoLocal = rho + sqrt(50*50) * distribution(generator);
-        dist=getWallsRangeAt(particles.col(i),alpha);
-        err_sqr = pow((dist-rhoLocal),2);
-        weights[i]*=inv_sqrt*exp(err_sqr*inv_var);
+        rhoLocal = rho + sqrt(rhoVar) * distribution(generator);
+        dist = getWallsRangeAt(particles.col(i), alpha);
+        err_sqr = pow((dist - rhoLocal), 2);
+        double newW = inv_sqrt * exp(err_sqr * inv_var);
+        weights[i] *= newW;
         /*std::cout << "dist: "<<dist<<std::endl;
         std::cout << "rho: "<<rho<<std::endl;
         std::cout << "alpha: "<<alpha*180./M_PI<<std::endl;
@@ -178,7 +158,6 @@ void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const
         cout << "inv_var= "<<inv_var<<endl;
         cout << "exp(err_sqr*inv_var): "<<exp(err_sqr*inv_var)<<endl;
         std::cout << "loGweight["<<i<<"]: "<<weights[i]<<std::endl;*/
-        this->normalize();
     }
 }
 
@@ -241,30 +220,29 @@ void ParticleFilter::update_echosounder(const double& beam, const double& beamVa
 
 void ParticleFilter::resample() {
     normalize();
-    // Draw PARTICLE_NUMBER uniformly distributed number between 0,1 and compute their log
-    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        uniforms[i] = uniformDistribution(generator);
+    double cumulativeSum[PARTICLE_NUMBER];
+
+    cumulativeSum[0] = weights[0];
+
+    for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
+        cumulativeSum[i] = cumulativeSum[i - 1] + weights[i];
     }
 
     // For each logUniform, compute the cumulative sum of the weights
     // and stop when the logUniform value is reached: keep this particle
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        double cumSumTarget = uniforms[i];
-        double cumSum = weights[0];
+        double cumSumTarget = uniformDistribution(generator);
         unsigned int idx = 0;
-        
-        while(cumSum<cumSumTarget)
-        {
+
+        while (cumulativeSum[idx] < cumSumTarget) {
             idx++;
-            cumSum+=weights[idx];
         }
         if (idx >= PARTICLE_NUMBER) {
             cout << "Problem!" << endl;
-            cout << "CumSum: "<<cumSum<<endl;
-            cout << "CumSumTarget: "<<cumSumTarget<<endl;
-            for(unsigned int k=0;k<PARTICLE_NUMBER;k++)
-            {
-                cout << "weights["<<k<<"]: "<<weights[k]<<", w["<<k<<"]= "<<weights[k]<<endl;
+            cout << "CumSum[" << idx << "] : " << cumulativeSum[idx] << endl;
+            cout << "CumSumTarget: " << cumSumTarget << endl;
+            for (unsigned int k = 0; k < PARTICLE_NUMBER; k++) {
+                cout << "weights[" << k << "]: " << weights[k] << ", w[" << k << "]= " << weights[k] << endl;
             }
             exit(EXIT_FAILURE);
             // Find a smarter way to admit things went wrong
@@ -274,15 +252,93 @@ void ParticleFilter::resample() {
         }
     }
     particles = particlesSwap;
-    memcpy(&weights[0], &weights[0], sizeof (double)*PARTICLE_NUMBER);
+    memcpy(&weights[0], &weightsSwap[0], sizeof (double)*PARTICLE_NUMBER);
+}
+void ParticleFilter::resampleResidual() {
+    blah++;
+    if(blah>=84)
+    {
+        cout << "debug me"<<endl;
+    }
+    this->normalize();
+    // Nb of copies of each particle
+    int nbCopies[PARTICLE_NUMBER];
+    int indexes[PARTICLE_NUMBER];
+
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        nbCopies[i] = abs((int) (weights[i] * PARTICLE_NUMBER));
+    }
+    int k = 0;
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        for (unsigned int j = 0; j < nbCopies[i]; j++) {
+            indexes[k] = i;
+            k++;
+        }
+    }
+
+    double residual[PARTICLE_NUMBER];
+    double residualSum = 0;
+
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        residual[i] = weights[i] * PARTICLE_NUMBER - nbCopies[i];
+        residualSum += residual[i];
+    }
+
+    // Normalize the residuals
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        residual[i] /= residualSum;
+    }
+
+    // multinomial resampling on the residual
+    double cumulativeSum[PARTICLE_NUMBER];
+    cumulativeSum[0] = residual[0];
+    for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
+        cumulativeSum[i] = cumulativeSum[i - 1] + residual[i];
+    }
+    
+    for (unsigned int i = 0; i < PARTICLE_NUMBER - k; i++) {
+        double cumSumTarget = min(uniformDistribution(generator),cumulativeSum[PARTICLE_NUMBER-1]);
+        unsigned int idx = 0;
+
+        while (cumulativeSum[idx] < cumSumTarget) {
+            idx++;
+        }
+        indexes[k + i] = idx;
+    }
+
+    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+        particlesSwap.col(i) = particles.col(indexes[i]);
+        weightsSwap[i] = weights[indexes[i]];
+    }
+    particles = particlesSwap;
+    memcpy(&weights[0], &weightsSwap[0], sizeof (double)*PARTICLE_NUMBER);
 }
 
 Vector2d ParticleFilter::computeMean() {
+    this->normalize();
     return particles.rowwise().mean();
 }
 
 Matrix2d ParticleFilter::computeCovariance() {
+    this->normalize();
     Matrix<double, 2, PARTICLE_NUMBER> centered = particles.colwise() - particles.rowwise().mean();
-    Matrix2d prod = centered*centered.transpose();
+    Matrix2d prod = centered * centered.transpose();
     return (prod) / double(particles.cols() - 1);
+}
+
+Vector2d ParticleFilter::computeWeightedMean() {
+    normalize();
+    Map<Matrix<double, 1, PARTICLE_NUMBER> > weightVec(weights);
+    Vector2d res = (weightVec * particles.transpose()).transpose();
+    return res;
+}
+
+Matrix2d ParticleFilter::computeWeightedCovariance() {
+    normalize();
+    Map<Matrix<double, 1, PARTICLE_NUMBER> > weightVec(weights);
+    double sum = weightVec.sum();
+    double sumSquare = weightVec.squaredNorm();
+    double squareSum = sum*sum;
+    // TODO
+    //Matrix2d res = 
 }

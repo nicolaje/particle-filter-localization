@@ -1,7 +1,7 @@
 #ifndef PARTICLE_FILTER_H
 #define PARTICLE_FILTER_H
 
-#define PARTICLE_NUMBER 190 // Number of particles
+#define PARTICLE_NUMBER 5 // Number of particles
 
 #include <random>
 #include "../Eigen/Dense"
@@ -182,10 +182,12 @@ public:
     void update_GPS(const double &n, const double &nVar, const double &e, const double &eVar);
 
     /**
-     * Uses Low-variance resampling method
+     * Uses Low-variance/Multinomial resampling method
      */
     void resample();
 
+    void resampleResidual();
+    
     Eigen::Vector2d computeMean();
     Eigen::Matrix2d computeCovariance();
 

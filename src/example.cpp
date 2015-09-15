@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
 
     // Intantiate Localizer object
     ParticleFilter pf;
+    pf.setWallsFile("map.txt");
     Pose &p0 = simu.currentPose();
 
     Vector2d p(p0.x, p0.y);
@@ -42,8 +43,11 @@ int main(int argc, char** argv) {
     vibes::newGroup("particles", vibesParams("color", "red"));
 
     vibes::newGroup("AUV", vibesParams("color", "black"));
+    
+    int reSample=0;
     while (simu.nextStep() != -1) {
-
+        reSample++;
+        
         // Current point of the trajectory
         Pose &p = simu.currentPose();
 
@@ -58,12 +62,8 @@ int main(int argc, char** argv) {
         uCov(1,1)=pow(6./3,2);
     
         pf.predict(p.t, u, uCov);
-        //localizer.predict(p.speed, p.theta, p.t);
-
-        double d = simu.genSonarDist(p.x, p.y, p.theta, p.t);
         
         Vector2d mean = pf.computeMean();
-        
         Matrix2d cov=pf.computeCovariance();
         
         vibes::clearGroup("particles");
@@ -74,12 +74,14 @@ int main(int argc, char** argv) {
             vibes::drawCircle(particles.col(i)[0],particles.col(i)[1],0.01,vibesParams("group","particles"));
         }
         
-        vibes::drawConfidenceEllipse(mean[0],mean[1],cov(0,0),cov(0,1),cov(1,1),3,vibesParams("group","particles", "color","red"));
+        //vibes::drawConfidenceEllipse(mean[0],mean[1],cov(0,0),cov(0,1),cov(1,1),3,vibesParams("group","particles", "color","red"));
+        
+        double d = simu.genSonarDist(p.x, p.y, p.theta, p.t);
         if (d >= 0) { // the measurment is valid
             double alpha = simu.getSonarAngle(p.t) + p.theta; // sonar beam angle
-            cout << "beam angle: " << alpha << endl;
-            pf.update_walls(d,1,alpha,1,p.theta,1);
-            pf.resample();
+            pf.update_walls(d,25,alpha,1);
+            if(reSample%100==0)
+                pf.resample();
             //Interval ialpha = Interval(alpha).inflate(2*M_PI/180.0);
             //Interval irho = Interval(d).inflate(0.2);
             //localizer.update(irho, ialpha, p.t);

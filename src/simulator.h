@@ -5,8 +5,9 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <float.h>
 
-#define oo 1/0.
+
 
 struct Pose {
     double t;
@@ -113,7 +114,7 @@ inline void DistanceDirSegment(double& d,double& phi,
     double z4=Det(ux,uy,ab_x,ab_y);
     double z5=std::min(z1,std::min(z2,z3));
     double d1=z3/z4;
-    d= (z5 < 0) ? oo :d1;
+    d= (z5 < 0) ? DBL_MAX :d1;
     phi=atan2(-ab_x,ab_y); //phi is the angle of the normal vector of [a,b]
 }
 
@@ -121,7 +122,7 @@ inline void DistanceDirSegments(double& d,double& phi,
                                 double mx, double my, double theta,
                                 std::vector<double> ax, std::vector<double> ay, std::vector<double> bx, std::vector<double> by)
 {      // Distance directionnelle relativement � un polygone (le tri�dre m-a-b doit �tre direct, sinon cette distance est infinie)
-        d=oo;
+        d=DBL_MAX;
         for (unsigned int j=0;j<ax.size();j++)
            {double dj,phij;
             DistanceDirSegment(dj,phij,mx,my,theta,ax[j],ay[j],bx[j],by[j]);

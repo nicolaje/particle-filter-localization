@@ -10,11 +10,28 @@ ParticleFilter::ParticleFilter() {
     this->uniformDistribution = std::uniform_real_distribution<double>(0, 1);
     this->isInit = false;
     this->lastTime = false;
-    double logNorm=-log(PARTICLE_NUMBER);
+    double norm=1./PARTICLE_NUMBER;
     for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
     {
-        logWeights[i]=logNorm;
+        weights[i]=norm;
     }
+}
+
+void ParticleFilter::setWallsFile(const std::string &filePath)
+{
+    std::ifstream in_file;
+    in_file.open(filePath, ios::in);
+    if(in_file.fail()) {
+        std::stringstream s;
+        s << "Simulator [load]: cannot open file " << filePath << "for reading the map";
+        std::cerr << s.str() << std::endl;
+        exit(-1);
+    }
+    Wall wall;
+    while(in_file >> wall){
+        walls.push_back(wall);
+    }
+    in_file.close();
 }
 
 Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles()
@@ -28,24 +45,33 @@ Eigen::Matrix<double, 2, PARTICLE_NUMBER> &ParticleFilter::getParticles()
 
 void ParticleFilter::normalize() {
     // Get the highest likelyhood
-    double maxLW = logWeights[0];
-    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        if (logWeights[1] > maxLW) {
-            maxLW = logWeights[i];
-        }
-    }
+    //double maxLW = logWeights[0];
+    //for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+    //    if (logWeights[1] > maxLW) {
+    //        maxLW = logWeights[i];
+    //    }
+    //}
 
     // Using the log-sum of exponentials transform to avoid overflow
     // cf: http://lingpipe-blog.com/2009/06/25/log-sum-of-exponentials/
-    double sumExp = exp(logWeights[0]-maxLW);
-    for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
-        sumExp += exp(logWeights[i]-maxLW);
+    //double sumExp = exp(logWeights[0]-maxLW);
+    //for (unsigned int i = 1; i < PARTICLE_NUMBER; i++) {
+    //    sumExp += exp(logWeights[i]-maxLW);
+    //}
+
+    //double logSumExp = maxLW + log(sumExp);
+
+    //for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
+    //    logWeights[i] -= logSumExp;
+    //}
+    double sumW=weights[0];
+    for(unsigned int i=1;i<PARTICLE_NUMBER;i++)
+    {
+        sumW+=weights[i];
     }
-
-    double logSumExp = maxLW + log(sumExp);
-
-    for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        logWeights[i] -= logSumExp;
+    for(unsigned int i=0;i<PARTICLE_NUMBER;i++)
+    {
+        weights[i]/=sumW;
     }
 }
 
@@ -57,7 +83,6 @@ void ParticleFilter::init(const Eigen::Vector2d &initPos, const Eigen::Matrix2d 
     vector<VectorXd> initPositions = this->drawSamples(PARTICLE_NUMBER, initPos, initPosCov);
 
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        cout << "initPositions["<<i<<"]: "<<endl<<initPositions[i]<<endl;
         this->particles.col(i) = initPositions[i];
     }
     this->isInit = true;
@@ -98,6 +123,20 @@ vector<VectorXd> ParticleFilter::drawSamples(const int& nbParticle, const Vector
     return res;
 }
 
+double ParticleFilter::getWallsRangeAt(const Eigen::Vector2d &point, const double &theta)
+{
+    double dist=1000;
+    
+    for(unsigned int j=0;j<walls.size();j++)
+        {
+            Wall &w=walls[j];
+            double dj,phij;
+            CalcDistanceDirSegment(dj,phij,point[0],point[1],theta,w[0],w[1],w[2],w[3]);
+            dist = (dj < dist) ? dj : dist;
+        }
+    return dist;
+}
+
 void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d &uCov) {
     if (!this->lastTimeinit) {
         this->lastTimeinit = true;
@@ -119,19 +158,27 @@ void ParticleFilter::predict(const double &t, const Vector2d &u, const Matrix2d 
     this->lastTime = t;
 }
 
-void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const double &alpha, const double &alphaVar, const double &theta, const double &thetaVar) {
-    double rhoLocal, alphaLocal,dist,err_sqr;
-    double log_inv_sqrt = -0.5*2.5066282746310002 * sqrt(rhoVar);
+void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const double &alpha, const double &alphaVar) {
+    double rhoLocal, dist,err_sqr;
+    double inv_sqrt = 1/sqrt(rhoVar*2*M_PI);
     double inv_var = 1./(2*rhoVar);
+    std::cout<<"update_walls"<<std::endl;
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        rhoLocal = rho + sqrt(rhoVar) * distribution(generator);
-        alphaLocal = alpha + sqrt(alphaVar) * distribution(generator);
-        dist=getWallsRangeAt(particles.col(i),theta*M_PI/2,alpha*M_PI/2);
-        err_sqr = pow(dist-rho,2);
-        cout << "logWeights["<<i<<"] avant: "<<logWeights[i]<<endl;
-        logWeights[i]+=log_inv_sqrt-err_sqr*inv_var;
-        cout << "logWeights["<<i<<"] apres: "<<logWeights[i]<<endl;
-        cout << "Pour une erreur de : "<<sqrt(err_sqr)<<endl;
+        rhoLocal = rho + sqrt(50*50) * distribution(generator);
+        dist=getWallsRangeAt(particles.col(i),alpha);
+        err_sqr = pow((dist-rhoLocal),2);
+        weights[i]*=inv_sqrt*exp(err_sqr*inv_var);
+        /*std::cout << "dist: "<<dist<<std::endl;
+        std::cout << "rho: "<<rho<<std::endl;
+        std::cout << "alpha: "<<alpha*180./M_PI<<std::endl;
+        std::cout << "alpha%360: "<<fmod(((alpha*180./M_PI)),360)<<std::endl;
+        std::cout << "err: "<<sqrt(err_sqr)<<std::endl;
+        std::cout << "particle: "<<std::endl<<particles.col(i)<<std::endl;
+        cout << "inv_sqrt= "<<inv_sqrt<<endl;
+        cout << "inv_var= "<<inv_var<<endl;
+        cout << "exp(err_sqr*inv_var): "<<exp(err_sqr*inv_var)<<endl;
+        std::cout << "loGweight["<<i<<"]: "<<weights[i]<<std::endl;*/
+        this->normalize();
     }
 }
 
@@ -142,7 +189,7 @@ void ParticleFilter::update_range(const Vector2d &emitterPos, const double& rang
         double err_sqr = pow((emitterPos - particles.col(i)).norm() - range, 2);
 
         // Update the log-odds
-        logWeights[i] += log_inv_sqrt - err_sqr*inv_var;
+        //logWeights[i] += log_inv_sqrt - err_sqr*inv_var;
     }
 }
 
@@ -153,7 +200,7 @@ void ParticleFilter::update_sonar_vertical(const double& beamRange, const double
         double zEnd = z + beamRange * sin(beamAngle * M_PI / 180);
         OcTreeNode* search = bathyMap->search(xEnd, yEnd, z);
         if (search != NULL) {
-            this->logWeights[i] += search->getLogOdds();
+            //this->logWeights[i] += search->getLogOdds();
         } else {
             // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
@@ -168,7 +215,7 @@ void ParticleFilter::update_sonar_horizontal(const double& beamRange, const doub
         double zEnd = z;
         OcTreeNode* search = bathyMap->search(xEnd, yEnd, z);
         if (search != NULL) {
-            this->logWeights[i] += search->getLogOdds();
+            //this->logWeights[i] += search->getLogOdds();
         } else {
             // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
@@ -184,7 +231,7 @@ void ParticleFilter::update_echosounder(const double& beam, const double& beamVa
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         OcTreeNode* search = bathyMap->search(particles.col(i)[0], particles.col(i)[1], z);
         if (search != NULL) {
-            this->logWeights[i] += search->getLogOdds();
+            //this->logWeights[i] += search->getLogOdds();
         } else {
             // Decide what to do when sonar hits free space
             // Maybe cast a ray and then compute the error !
@@ -203,29 +250,31 @@ void ParticleFilter::resample() {
     // and stop when the logUniform value is reached: keep this particle
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
         double cumSumTarget = uniforms[i];
-        double cumSum = 0;
-        unsigned int j = 0;
+        double cumSum = weights[0];
+        unsigned int idx = 0;
         
-        for (j = 0; j < PARTICLE_NUMBER  && cumSum < cumSumTarget; j++) {
-            cumSum += exp(logWeights[j]);
+        while(cumSum<cumSumTarget)
+        {
+            idx++;
+            cumSum+=weights[idx];
         }
-        if (j == PARTICLE_NUMBER) {
+        if (idx >= PARTICLE_NUMBER) {
             cout << "Problem!" << endl;
             cout << "CumSum: "<<cumSum<<endl;
             cout << "CumSumTarget: "<<cumSumTarget<<endl;
+            for(unsigned int k=0;k<PARTICLE_NUMBER;k++)
+            {
+                cout << "weights["<<k<<"]: "<<weights[k]<<", w["<<k<<"]= "<<weights[k]<<endl;
+            }
             exit(EXIT_FAILURE);
             // Find a smarter way to admit things went wrong
         } else {
-            cout << "i: "<<i<<", j: "<<j<<endl;
-            cout << "particlesSwap.cols(): "<<particlesSwap.cols()<<", particlesSwap.rows()"<<particlesSwap.cols()<<endl;
-            cout << "particles.cols(): "<<particles.cols()<<", particles.rows()"<<particles.cols()<<endl;
-            particlesSwap.col(i) = particles.col(j);
-            logWeightsSwap[i] = logWeights[j];
+            particlesSwap.col(i) = particles.col(idx);
+            weightsSwap[i] = weights[idx];
         }
     }
     particles = particlesSwap;
-    memcpy(&logWeights[0], &logWeights[0], sizeof (double)*PARTICLE_NUMBER);
-    //logWeights=logWeightsSwap;
+    memcpy(&weights[0], &weights[0], sizeof (double)*PARTICLE_NUMBER);
 }
 
 Vector2d ParticleFilter::computeMean() {

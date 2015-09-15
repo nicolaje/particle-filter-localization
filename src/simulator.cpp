@@ -51,7 +51,7 @@ double Simulator::genSonarDist(double px, double py, double theta, double t)
     }
 
     if( t * freq - round(t*freq) == 0){
-        double d=oo;
+        double d=DBL_MAX;
         for (uint j=0;j<walls.size();j++){
             Wall &w  = walls[j];
             double dj,phij;

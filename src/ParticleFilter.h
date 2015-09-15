@@ -1,13 +1,14 @@
 #ifndef PARTICLE_FILTER_H
 #define PARTICLE_FILTER_H
 
-#define PARTICLE_NUMBER 2 // Number of particles
+#define PARTICLE_NUMBER 190 // Number of particles
 
 #include <random>
 #include "../Eigen/Dense"
 #include <octomap/octomap.h>
 #include <octomap/OcTree.h>
 #include <algorithm>
+#include <iostream>
 
 class ParticleFilter {
 private:
@@ -79,28 +80,15 @@ struct Wall {
     d= (z5 < 0) ? 1000 :d1;
     phi=atan2(-ab_x,ab_y); //phi is the angle of the normal vector of [a,b]
 }
-inline double getWallsRangeAt(const Eigen::Vector2d &point, const double &theta, const double &phi)
-{
-    double dist;
-    for(unsigned int j=0;j<walls.size();j++)
-        {
-            Wall &w=walls[j];
-            double dj,phij;
-            CalcDistanceDirSegment(dj,phij,point[0],point[1],phi,w[0],w[1],w[2],w[3]);
-            dist = (dj < dist) ? dj : dist;
-        }
-    return dist;
-}
- 
     
     
     Walls walls;
 
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> particles;
-    double logWeights[PARTICLE_NUMBER];
+    double weights[PARTICLE_NUMBER];
 
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> particlesSwap;
-    double logWeightsSwap[PARTICLE_NUMBER];
+    double weightsSwap[PARTICLE_NUMBER];
 
     double uniforms[PARTICLE_NUMBER];
 
@@ -148,7 +136,7 @@ public:
      */
     void predict(const double &t, const Eigen::Vector2d &u, const Eigen::Matrix2d &uCov);
 
-    void update_walls(const double &rho, const double &rhoVar, const double &alpha, const double &alphaVar, const double &theta, const double &thetaVar);
+    void update_walls(const double &rho, const double &rhoVar, const double &alpha, const double &alphaVar);
 
     /**
      *

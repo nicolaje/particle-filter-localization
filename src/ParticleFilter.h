@@ -1,7 +1,7 @@
 #ifndef PARTICLE_FILTER_H
 #define PARTICLE_FILTER_H
 
-#define PARTICLE_NUMBER 5 // Number of particles
+#define PARTICLE_NUMBER 500 // Number of particles
 
 #include <random>
 #include "../Eigen/Dense"
@@ -9,12 +9,19 @@
 #include <octomap/OcTree.h>
 #include <algorithm>
 #include <iostream>
+#include <float.h>
 
+    enum sampling_methods{MULTINOMIAL,RESIDUAL,LOW_VARIANCE};
 class ParticleFilter {
 private:
+    double wSlow;
+    double wFast;
+    double aSlow;
+    double aFast;
     std::default_random_engine generator;
     std::normal_distribution<double> distribution;
     std::uniform_real_distribution<double> uniformDistribution;
+    std::bernoulli_distribution bernoulliDistribution;
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
     octomap::OcTree *bathyMap;
 
@@ -25,7 +32,6 @@ private:
     bool lastTimeinit;
     double lastTime;
 
-    // Code Benoit Desrochers
 #ifndef WALL_MAP
 #define WALL_MAP
 
@@ -80,7 +86,10 @@ struct Wall {
     d= (z5 < 0) ? 1000 :d1;
     phi=atan2(-ab_x,ab_y); //phi is the angle of the normal vector of [a,b]
 }
-    
+
+    int nbScanline;
+    // Number of scanline updates, reseted every "nbScanline" scanline
+    int scanLineUpdates;
     
     Walls walls;
 
@@ -90,6 +99,8 @@ struct Wall {
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> particlesSwap;
     double weightsSwap[PARTICLE_NUMBER];
 
+    Eigen::Matrix<double, 2, PARTICLE_NUMBER> particlesInertial;
+    
     double uniforms[PARTICLE_NUMBER];
 
     void normalize();
@@ -106,6 +117,18 @@ public:
 
     ParticleFilter();
 
+    
+    int sampling_method;
+    /**
+     * Resample every X scanline
+     * @param nbScanLine
+     */
+    void setResampleEvery(const int &nbScanLine);
+
+    void setResampleMethod(const int &method);
+    
+    void setAlphas(const double &alphaSlow,const double &alphaFast);
+    
     Eigen::Matrix<double, 2, PARTICLE_NUMBER> &getParticles();
     
     
@@ -182,11 +205,16 @@ public:
     void update_GPS(const double &n, const double &nVar, const double &e, const double &eVar);
 
     /**
-     * Uses Low-variance/Multinomial resampling method
+     * Uses Multinomial resampling method
      */
     void resample();
 
     void resampleResidual();
+    
+    /**
+     * 
+     */
+    void resampleLowVariance();
     
     Eigen::Vector2d computeMean();
     Eigen::Matrix2d computeCovariance();
@@ -196,4 +224,31 @@ public:
 
 };
 
+
+
+inline double Det2(double &ax, double& ay, double& bx, double &by){
+    return ax*by - ay*bx;
+}
+
+inline void DistanceDirSegment2(double& d,double& phi,
+                                               double mx, double my, double theta,
+                                               double ax, double ay, double bx, double by)
+{      // Distance directionnelle du point m au segment [a,b].
+    double ma_x=ax-mx;
+    double ma_y=ay-my;
+    double mb_x=bx-mx;
+    double mb_y=by-my;
+    double ab_x=bx-ax;
+    double ab_y=by-ay;
+    double ux=cos(theta);
+    double uy=sin(theta);
+    double z1=Det2(ma_x,ma_y,ux,uy);
+    double z2=Det2(ux,uy,mb_x,mb_y);
+    double z3=Det2(ma_x,ma_y,ab_x,ab_y);
+    double z4=Det2(ux,uy,ab_x,ab_y);
+    double z5=std::min(z1,std::min(z2,z3));
+    double d1=z3/z4;
+    d= (z5 < 0) ? DBL_MAX :d1;
+    phi=atan2(-ab_x,ab_y); //phi is the angle of the normal vector of [a,b]
+}
 #endif // PARTICLE_FILTER_H

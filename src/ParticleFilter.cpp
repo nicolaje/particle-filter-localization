@@ -201,14 +201,20 @@ void ParticleFilter::update_walls(const double &rho, const double &rhoVar, const
 }
 
 void ParticleFilter::update_range(const Vector2d &emitterPos, const double& range, const double& rangeVar) {
-    double log_inv_sqrt = -0.5 * 2.5066282746310002 * sqrt(rangeVar);
+    double inv_sqrt = 1/sqrt(2*M_PI*rangeVar);
     double inv_var = 1. / (2 * rangeVar);
+    
+    normalize();
+    double wAvg = 0;
     for (unsigned int i = 0; i < PARTICLE_NUMBER; i++) {
-        double err_sqr = pow((emitterPos - particles.col(i)).norm() - range, 2);
-
-        // Update the log-odds
-        //logWeights[i] += log_inv_sqrt - err_sqr*inv_var;
+        double localRange=range+distribution(generator);
+        double err_sqr = pow((emitterPos - particles.col(i)).norm() - localRange, 2);
+        double newW=inv_sqrt*exp(-err_sqr*inv_var);
+        weights[i]*=newW;
+        wAvg += weights[i] / PARTICLE_NUMBER;
     }
+    wSlow += aSlow * (wAvg - wSlow);
+    wFast += aFast * (wAvg - wFast);
 }
 
 void ParticleFilter::update_sonar_vertical(const double& beamRange, const double& beamRangeVar, const double& beamAngle, const double& robotYaw, const double& z) {
